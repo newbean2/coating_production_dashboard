@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>코팅 설비 생산일지 대시보드</title>
+    <!-- 외부 프레임워크 없이 자체 CSS 파일만 연결합니다 -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 1. 대시보드 헤더 영역 -->
+        <header class="dashboard-header">
+            <div class="header-title">
+                <h1>코팅 설비 생산 대시보드</h1>
+                <p class="subtitle">생산일지 CSV 파일을 업로드하여 설비 가동 현황 및 생산 품질을 한눈에 분석합니다.</p>
+            </div>
+            <!-- CSV 파일 선택 버튼 영역 -->
+            <div class="file-upload-area">
+                <label for="csvFileInput" class="file-upload-label">
+                    <span class="upload-icon">📁</span> CSV 파일 선택
+                </label>
+                <input type="file" id="csvFileInput" accept=".csv" class="file-input">
+                <span id="fileNameDisplay" class="file-name">선택된 파일 없음</span>
+            </div>
+        </header>
+
+        <!-- 2. 요약 카드 영역 (총 롤 수, 불량률, 가동률, 총 로스시간) -->
+        <section class="summary-cards">
+            <div class="card">
+                <div class="card-label">총 롤 수</div>
+                <div class="card-value" id="cardTotalRolls">-</div>
+                <div class="card-subtext">전체 생산 롤 수량</div>
+            </div>
+            <div class="card">
+                <div class="card-label">불량률</div>
+                <div class="card-value text-danger" id="cardDefectRate">-</div>
+                <div class="card-subtext">판정 NG 비율</div>
+            </div>
+            <div class="card">
+                <div class="card-label">가동률</div>
+                <div class="card-value text-primary" id="cardOperationRate">-</div>
+                <div class="card-subtext">생산시간 / (생산+로스시간)</div>
+            </div>
+            <div class="card">
+                <div class="card-label">총 로스시간</div>
+                <div class="card-value text-warning" id="cardTotalLoss">-</div>
+                <div class="card-subtext">설비 정지 및 지연 시간</div>
+            </div>
+        </section>
+
+        <!-- 3. 차트 영역 (모든 그래프는 세로 막대 형식으로 표시) -->
+        <section class="charts-container">
+            <!-- 설비별 생산 롤 수 (많은순) -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2>설비별 생산 롤 수</h2>
+                    <span class="chart-badge">생산량 많은순</span>
+                </div>
+                <div id="equipmentBarChart" class="vertical-bar-chart">
+                    <div class="empty-notice">CSV 파일을 업로드하면 차트가 표시됩니다.</div>
+                </div>
+            </div>
+
+            <!-- 일자별 생산 롤 수 (날짜순) -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2>일자별 생산 롤 수</h2>
+                    <span class="chart-badge">날짜 오름차순</span>
+                </div>
+                <div id="dailyBarChart" class="vertical-bar-chart">
+                    <div class="empty-notice">CSV 파일을 업로드하면 차트가 표시됩니다.</div>
+                </div>
+            </div>
+
+            <!-- 생산모델별 생산 롤 수 (많은순) -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2>생산모델별 생산 롤 수</h2>
+                    <span class="chart-badge">생산량 많은순</span>
+                </div>
+                <div id="modelBarChart" class="vertical-bar-chart">
+                    <div class="empty-notice">CSV 파일을 업로드하면 차트가 표시됩니다.</div>
+                </div>
+            </div>
+
+            <!-- 설비별 생산시간과 로스시간 (분 단위 비교) -->
+            <div class="chart-card chart-card-wide">
+                <div class="chart-header">
+                    <h2>설비별 생산시간 및 로스시간</h2>
+                    <span class="chart-badge">시간 합계(분)</span>
+                </div>
+                <div class="chart-legend">
+                    <span><i class="legend-color production-color"></i>생산시간</span>
+                    <span><i class="legend-color loss-color"></i>로스시간</span>
+                </div>
+                <div id="equipmentTimeChart" class="vertical-bar-chart time-chart">
+                    <div class="empty-notice">CSV 파일을 업로드하면 차트가 표시됩니다.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. NG 판정 데이터만 별도로 모아 한눈에 확인하는 영역 -->
+        <section class="table-section ng-section">
+            <div class="table-header">
+                <h2>NG 판정 롤 전체 목록</h2>
+                <span class="table-count ng-count" id="ngTableRowCount">NG 0건</span>
+            </div>
+            <div class="table-legend">
+                <span class="legend-item"><span class="legend-box ng-box"></span> 판정이 NG인 데이터만 표시</span>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>생산일자</th>
+                            <th>설비명</th>
+                            <th>MES NO</th>
+                            <th>생산모델</th>
+                            <th>두께(좌)</th>
+                            <th>두께(중)</th>
+                            <th>두께(우)</th>
+                            <th>무게</th>
+                            <th>통기도</th>
+                            <th>인장강도</th>
+                            <th>생산시간(분)</th>
+                            <th>로스시간(분)</th>
+                            <th>판정</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ngTableBody">
+                        <tr>
+                            <td colspan="13" class="empty-table-cell">파일을 선택해 NG 데이터를 확인해 주세요.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 5. 전체 생산 롤 데이터 테이블 영역 -->
+        <section class="table-section">
+            <div class="table-header">
+                <h2>전체 롤 생산 목록</h2>
+                <span class="table-count" id="tableRowCount">전체 0건</span>
+            </div>
+            <div class="table-legend">
+                <span class="legend-item"><span class="legend-box ng-box"></span> 불량(NG) 롤 행 강조</span>
+                <span class="legend-item"><span class="legend-box ok-box"></span> 정상(OK) 롤</span>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr id="tableHeaderRow">
+                            <th>생산일자</th>
+                            <th>설비명</th>
+                            <th>MES NO</th>
+                            <th>생산모델</th>
+                            <th>두께(좌)</th>
+                            <th>두께(중)</th>
+                            <th>두께(우)</th>
+                            <th>무게</th>
+                            <th>통기도</th>
+                            <th>인장강도</th>
+                            <th>생산시간(분)</th>
+                            <th>로스시간(분)</th>
+                            <th>판정</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="13" class="empty-table-cell">파일을 선택해 데이터를 불러와 주세요.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- 외부 라이브러리 없이 순수 자바스크립트 파일만 연결 -->
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
